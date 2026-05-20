@@ -14,8 +14,6 @@ class DailyRewardCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rewardState = ref.watch(dailyRewardProvider);
-    final buttonEnabled =
-        rewardState.canClaim && !rewardState.isLoading;
 
     String statusText;
 
@@ -38,6 +36,8 @@ class DailyRewardCard extends ConsumerWidget {
       }
     }
 
+    final isDisabled = !rewardState.canClaim || rewardState.isLoading;
+
     return GlassCard(
       child: Row(
         children: [
@@ -51,9 +51,8 @@ class DailyRewardCard extends ConsumerWidget {
             ),
             child: Icon(
               Icons.card_giftcard_rounded,
-              color: rewardState.canClaim
-                  ? ColorConstants.coinColor
-                  : Colors.grey,
+              color:
+                  rewardState.canClaim ? ColorConstants.coinColor : Colors.grey,
               size: 28,
             ),
           ),
@@ -72,7 +71,6 @@ class DailyRewardCard extends ConsumerWidget {
                     color: rewardState.canClaim ? null : Colors.grey,
                   ),
                 ),
-
                 Text(
                   statusText,
                   style: TextStyle(
@@ -86,57 +84,71 @@ class DailyRewardCard extends ConsumerWidget {
             ),
           ),
 
-          GameButton(
-            text: rewardState.isLoading
-                ? 'Claiming...'
-                : rewardState.canClaim
-                    ? 'Claim'
-                    : 'Claimed',
-            isLoading: rewardState.isLoading,
-            onPressed: buttonEnabled
-                ? () async {
-                    final messenger = ScaffoldMessenger.of(context);
+          Stack(
+            children: [
+              /// 🔥 MAIN BUTTON
+              GameButton(
+                text: rewardState.isLoading
+                    ? 'Claiming...'
+                    : rewardState.canClaim
+                        ? 'Claim'
+                        : 'Claimed',
+                isLoading: rewardState.isLoading,
+                onPressed: rewardState.canClaim && !rewardState.isLoading
+                    ? () async {
+                        final messenger = ScaffoldMessenger.of(context);
 
-                    final result = await ref
-                        .read(dailyRewardProvider.notifier)
-                        .claim();
+                        final result = await ref
+                            .read(dailyRewardProvider.notifier)
+                            .claim();
 
-                    switch (result) {
-                      case ClaimResult.success:
-                        messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              '🎉 Reward Claimed Successfully!',
+                        if (!context.mounted) return;
+
+                        if (result == ClaimResult.success) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content:
+                                  Text('🎉 Reward Claimed Successfully!'),
+                              backgroundColor: ColorConstants.success,
                             ),
-                            backgroundColor: ColorConstants.success,
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                        break;
+                          );
+                        }
+                      }
+                    : null,
+                expanded: false,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                fontSize: 13,
+                gradient: rewardState.canClaim
+                    ? ColorConstants.premiumGradient
+                    : [Colors.grey, Colors.grey],
+              ),
 
-                      case ClaimResult.alreadyClaimed:
-                        messenger.showSnackBar(
-                          const SnackBar(
+              /// 🔥 OVERLAY (for disabled click)
+              if (isDisabled)
+                Positioned.fill(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
                             content: Text(
-                              '⏳ You already claimed. Try again after 24 hours.',
+                              rewardState.isLoading
+                                  ? 'Please wait...'
+                                  : '⏳ Come back after ${statusText}',
                             ),
                             backgroundColor: ColorConstants.warning,
-                            duration: Duration(seconds: 2),
                           ),
                         );
-                        break;
-                    }
-                  }
-                : null,
-            expanded: false,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 10,
-            ),
-            fontSize: 13,
-            gradient: rewardState.canClaim
-                ? ColorConstants.premiumGradient
-                : [Colors.grey, Colors.grey],
+                      },
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
